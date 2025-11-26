@@ -1,39 +1,63 @@
-name: VIX Chart Selenium Download
+name: VIX Chart Update
 
 on:
   schedule:
-    # 毎日 日本時間 朝8時 (UTC 23:00)
+    # 毎日 日本時間の朝8時 (UTC 23:00)
     - cron: '0 23 * * *'
-  workflow_dispatch: # 手動実行ボタン
+  workflow_dispatch: # 手動実行ボタン有効化
 
 permissions:
-  contents: write
+  contents: write # 画像を保存するために必須
 
 jobs:
-  scrape:
+  run-selenium:
     runs-on: ubuntu-latest
     
     steps:
+      # 1. リポジトリのコードを取得
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
+      # 2. Python環境のセットアップ
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.11'
 
-      - name: Install libraries
+      # 3. 必要なライブラリのインストール
+      # requirements.txt がある前提ですが、念のため直接インストールコマンドも記述しています
+      - name: Install dependencies
         run: |
-          pip install selenium
+          pip install selenium webdriver-manager
+          # もし requirements.txt があるなら以下も有効に
+          # pip install -r requirements.txt
 
+      # 4. Pythonスクリプトの実行
+      # ここで main.py が走り、画像のダウンロードとデバッグ撮影を行います
       - name: Run Selenium Script
         run: |
           python main.py
 
-      - name: Commit and Push Image
+      # 5. 【重要】デバッグ画像のアップロード
+      # 成功・失敗に関わらず(always)、debug_*.png があれば保存します
+      # GitHubのActions実行結果画面の「Artifacts」からダウンロードできるようになります
+      - name: Upload Debug Screenshots
+        if: always() 
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-screenshots
+          path: debug_*.png
+          retention-days: 5 # 5日で自動削除
+
+      # 6. 生成された画像をリポジトリに保存（コミット＆プッシュ）
+      - name: Commit and Push Chart
+        if: success() # スクリプトが成功した時だけ実行
         run: |
-          git config --global user.name 'GitHub Action'
-          git config --global user.email 'action@github.com'
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          # 生成された画像を追加
           git add vix_chart.png
-          # 変更がある場合のみコミット
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update chart via Selenium" && git push)
+          
+          # 変更がある場合のみコミットする（エラー回避）
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update VIX chart [skip ci]" && git push)
