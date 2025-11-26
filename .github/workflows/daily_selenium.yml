@@ -2,17 +2,17 @@ name: VIX Chart Update
 
 on:
   schedule:
-    # 毎日 日本時間の朝2時
+    # 毎日 日本時間の朝8時 (UTC 23:00)
     - cron: '0 23 * * *'
-  workflow_dispatch: # 手動実行ボタン有効化
+  workflow_dispatch: # 手動実行ボタンを有効にする
 
 permissions:
   contents: write # 画像を保存するために必須
 
 jobs:
-  run-selenium:
+  generate-chart:
     runs-on: ubuntu-latest
-    
+
     steps:
       # 1. リポジトリのコードを取得
       - name: Checkout code
@@ -25,33 +25,38 @@ jobs:
           python-version: '3.11'
 
       # 3. 必要なライブラリのインストール
-      # requirements.txt がある前提ですが、念のため直接インストールコマンドも記述しています
+      # selenium, webdriver-manager: 撮影用
+      # Pillow: 画像加工用
       - name: Install dependencies
         run: |
           pip install selenium webdriver-manager Pillow
-          # もし requirements.txt があるなら以下も有効に
-          # pip install -r requirements.txt
 
-      # 4. Pythonスクリプトの実行
-      # ここで main.py が走り、画像のダウンロードとデバッグ撮影を行います
-      - name: Run Selenium Script
+      # 4. 【ステップ1】撮影スクリプト実行
+      # ここで vix_chart.png が生成されます
+      - name: Run Step 1 (Screenshot)
         run: |
-          python main.py
+          python step1_screenshot.py
 
-      # 5. 【重要】デバッグ画像のアップロード
-      # 成功・失敗に関わらず(always)、debug_*.png があれば保存します
-      # GitHubのActions実行結果画面の「Artifacts」からダウンロードできるようになります
+      # 5. 【ステップ2】日時書き込みスクリプト実行
+      # ステップ1が成功した場合のみ実行されます
+      - name: Run Step 2 (Add Timestamp)
+        run: |
+          python step2_timestamp.py
+
+      # 6. デバッグ画像のアップロード
+      # 失敗した時(failure)だけ実行し、エラー画像(debug_error.png)を保存します
+      # 成功時はスキップされるので警告は出ません
       - name: Upload Debug Screenshots
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: debug-screenshots
           path: debug_*.png
-          retention-days: 5 # 5日で自動削除
+          retention-days: 5
 
-      # 6. 生成された画像をリポジトリに保存（コミット＆プッシュ）
+      # 7. 生成された画像をリポジトリに保存（コミット＆プッシュ）
       - name: Commit and Push Chart
-        if: success() # スクリプトが成功した時だけ実行
+        if: success() # すべて成功した時だけ実行
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
