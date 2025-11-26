@@ -2,8 +2,8 @@ name: VIX Chart Update
 
 on:
   schedule:
-    # 毎日 日本時間の昼12時 (UTC 03:00)
-    - cron: '0 3 * * *'
+    # 毎日 日本時間の朝8時 (UTC 23:00)
+    - cron: '0 23 * * *'
   workflow_dispatch: # 手動実行ボタン有効化
 
 permissions:
@@ -28,7 +28,7 @@ jobs:
       # requirements.txt がある前提ですが、念のため直接インストールコマンドも記述しています
       - name: Install dependencies
         run: |
-          pip install selenium webdriver-manager
+          pip install selenium webdriver-manager Pillow
           # もし requirements.txt があるなら以下も有効に
           # pip install -r requirements.txt
 
@@ -42,7 +42,7 @@ jobs:
       # 成功・失敗に関わらず(always)、debug_*.png があれば保存します
       # GitHubのActions実行結果画面の「Artifacts」からダウンロードできるようになります
       - name: Upload Debug Screenshots
-        if: always() 
+        if: failure() () 
         uses: actions/upload-artifact@v4
         with:
           name: debug-screenshots
